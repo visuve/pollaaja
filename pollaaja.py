@@ -71,7 +71,6 @@ if __name__ == "__main__":
 
         url = config.get("site", "url")
         text = config.get("site", "text")
-        mode = config.getint("site", "mode")
 
         host = config.get("smtp", "host")
         port = config.getint("smtp", "port")
@@ -82,7 +81,6 @@ if __name__ == "__main__":
         config.add_section("site")
         config["site"]["url"] = "https://google.com"
         config["site"]["text"] = "google"
-        config["site"]["mode"] = "0"
 
         config.add_section("smtp")
         config["smtp"]["host"] = "smtp.gmail.com"
