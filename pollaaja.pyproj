@@ -12,7 +12,8 @@
     <LaunchProvider>Standard Python launcher</LaunchProvider>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
     <Environment>PYSIDE_DESIGNER_PLUGINS=$(SolutionDir)</Environment>
-    <CommandLineArguments>-w=https://www.google.com/ -t=Google</CommandLineArguments>
+    <CommandLineArguments>
+    </CommandLineArguments>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="pollaaja.py" />

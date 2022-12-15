@@ -2,38 +2,46 @@
 # -*- coding: utf-8 -*-
 
 from datetime import datetime
-import argparse
+import configparser
 import requests
 import time
 import smtplib
 import ssl
 
-MESSAGE = """From: pollaaja@peelo.net
-To: {0}
-Content-Type: text/plain; charset=utf-8
-Subject: Notification!
 
-The text "{1}" can be found from {2}.
-"""
-
-class Pollaaja():
-    def __init__(self, url, text, host, port, username, password, recipient):
-        self.url = url
-        self.text = text
-        self.recipient = recipient
-        self.message = MESSAGE.format(recipient, text, url).encode("utf-8")
-
+class Emailer():
+    def __init__(self, host, port, username, password):
+        self.username = username
         self.ctx = ssl.create_default_context()
-        self.server = smtplib.SMTP_SSL(host, port, self.ctx)
+        self.server = smtplib.SMTP(host, port)
+        self.server.starttls(context=self.ctx)
         self.server.login(username, password)
 
     def __del__(self):
         self.server.quit()
 
-    def run(self):
-        found = False
+    def send_mail(self, recipient, message):
+        self.server.sendmail(self.username, [recipient], message)
 
-        while not found:
+
+class Pollaaja():
+    def __init__(self, url, text, emailer, sender, recipient):
+        self.url = url
+        self.text = text
+        self.emailer = emailer
+        self.recipient = recipient
+        self.message = """From: {0}
+To: {1}
+Content-Type: text/plain; charset=utf-8
+Subject: Notification!
+
+The text "{2}" cannot be found from {3}.
+""".format(sender, recipient, text, url).encode("utf-8")
+
+    def run(self):
+        found = True
+
+        while found:
             response = requests.get(self.url)
 
             print(datetime.now(), end=". HTTP status code = ")
@@ -46,38 +54,53 @@ class Pollaaja():
 
             found = response.text.find(self.text) >= 0
 
-            if found:
-                self.server.sendmail(
-                    "pollaaja@peelo.net",
-                    [self.recipient],
-                    self.message)
-                break
-            else:
-                print("The text is not found yet!")
+            if not found:
+                self.emailer.send(self.recipient, self.message)
+                return
 
+            print("The text is still present. No change!")
             time.sleep(300)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Poll a website for certain text")
-    parser.add_argument("-w", "--website", type=str, required=True, help="website to poll")
-    parser.add_argument("-t", "--text", type=str, required=True, help="text to poll")
 
-    parser.add_argument("-s", "--server", type=str, required=True, help="SMTP host/IP to connect")
-    parser.add_argument("-p", "--port", type=str, required=False, help="SMTP port to connect", default=587)
+    config = configparser.ConfigParser(strict=False)
 
-    parser.add_argument("-u", "--username", type=str, required=True, help="SMTP user")
+    try:
+        config.read("pollaaja.ini")
 
-    parser.add_argument("-r", "--recipient", type=str, required=True, help="notification email recipient")
+        url = config.get("site", "url")
+        text = config.get("site", "text")
+        mode = config.getint("site", "mode")
 
-    args = parser.parse_args()
+        host = config.get("smtp", "host")
+        port = config.getint("smtp", "port")
+        user = config.get("smtp", "user")
+        pwd = config.get("smtp", "pass")
+        recipient = config.get("smtp", "recipient")
+    except Exception as e:
+        config.add_section("site")
+        config["site"]["url"] = "https://google.com"
+        config["site"]["text"] = "google"
+        config["site"]["mode"] = "0"
 
-    pollaaja = Pollaaja(
-        args.website,
-        args.text,
-        args.host,
-        args.port,
-        args.username,
-        input("Type your password and press enter: "),
-        args.recipient)
-    pollaaja.run()
+        config.add_section("smtp")
+        config["smtp"]["host"] = "smtp.gmail.com"
+        config["smtp"]["port"] = "587"
+        config["smtp"]["user"] = "from@gmail.com"
+        config["smtp"]["pass"] = "password"
+        config["smtp"]["recipient"] = "to@gmail.com"
+
+        with open("pollaaja.ini", "w+") as config_file:
+            config.write(config_file)
+
+        print("Created pollaaja.ini. Please fill it out and run again.")
+        print(f"Exception details: {e}")
+
+        exit(2)
+
+    emailer = Emailer(host, port, user, pwd)
+
+    poller = Pollaaja(url, text, emailer, user, recipient)
+
+    poller.run()
