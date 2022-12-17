@@ -11,17 +11,24 @@ import ssl
 
 class Emailer():
     def __init__(self, host, port, username, password):
+        self.host = host
+        self.port = port
+
         self.username = username
-        self.ctx = ssl.create_default_context()
-        self.server = smtplib.SMTP(host, port)
-        self.server.starttls(context=self.ctx)
-        self.server.login(username, password)
+        self.password = password
+
+        with smtplib.SMTP(host, port) as server:
+            server.starttls(context=ssl.create_default_context())
+            server.login(username, password)
 
     def __del__(self):
         self.server.quit()
 
     def send_mail(self, recipient, message):
-        self.server.sendmail(self.username, [recipient], message)
+        with smtplib.SMTP(host, port) as server:
+            server.starttls(context=ssl.create_default_context())
+            server.login(self.username, self.password)
+            server.sendmail(self.username, [recipient], message)
 
 
 class Pollaaja():
@@ -74,8 +81,8 @@ if __name__ == "__main__":
 
         host = config.get("smtp", "host")
         port = config.getint("smtp", "port")
-        user = config.get("smtp", "user")
-        pwd = config.get("smtp", "pass")
+        username = config.get("smtp", "user")
+        password = config.get("smtp", "pass")
         recipient = config.get("smtp", "recipient")
     except Exception as e:
         config.add_section("site")
@@ -97,8 +104,14 @@ if __name__ == "__main__":
 
         exit(2)
 
-    emailer = Emailer(host, port, user, pwd)
+    emailer = Emailer(host, port, username, password)
 
-    poller = Pollaaja(url, text, emailer, user, recipient)
+    poller = Pollaaja(url, text, emailer, username, recipient)
 
-    poller.run()
+    try:
+        poller.run()
+    except Exception as e:
+        print("FUBAR:")
+        print(e)
+        input("Press enter to exit")
+        exit(1)
